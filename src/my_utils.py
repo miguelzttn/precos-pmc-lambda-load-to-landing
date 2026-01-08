@@ -1,10 +1,16 @@
 import json
 import boto3
+from boto3.s3.transfer import TransferConfig
 
 from io import BytesIO
 from zoneinfo import ZoneInfo
 from typing import List, Tuple
 from datetime import datetime, timedelta
+
+s3_client = boto3.client(
+    's3',
+    config=boto3.session.Config(max_pool_connections=50)
+)
 
 def _find_dates_in_event(event) -> List[datetime]:
 
@@ -51,8 +57,11 @@ def _list_all_possible_dates() -> List[datetime]:
 
     current_date = start_date
     while current_date <= end_date:
+
+        current_date = current_date.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
         date_list.append(current_date)
         current_date += timedelta(days=1)
+
     return date_list
 
 def _get_brt_yesterday():
@@ -60,18 +69,25 @@ def _get_brt_yesterday():
     return now_BRT - timedelta(days=1)
 
 def _send_to_s3_landing(date_reference: datetime, filename: str, content: BytesIO) -> Tuple[bool, str]:
-    s3_client = boto3.client('s3')
     
     # prefix as YYYY/MM/DD/
     prefix = date_reference.strftime('%Y/%m/%d/')
     filename = prefix + filename
 
-    try:
+    config = TransferConfig(
+        multipart_threshold=1024 * 1024 * 64, # 64
+        max_concurrency=6, # 6 cores
+        multipart_chunksize=1024 * 1024 * 64, # From 64 to 64MB
+        use_threads=True
+    )
 
-        s3_client.put_object(
+    try:
+        content.seek(0)
+        s3_client.upload_fileobj(
+            Fileobj=content,
             Bucket='precos-pmc-landing',
             Key=filename,
-            Body=content
+            Config=config
         )
         return True, 'OK'
     
