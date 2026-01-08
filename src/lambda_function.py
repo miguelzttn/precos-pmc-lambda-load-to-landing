@@ -44,7 +44,7 @@ def lambda_handler(event, context):
         try:            
             files = files_client.get_files_by_date(date_reference=date_reference)
             responses = {}
-
+            
             for filename, content in files.items():
                 status, msg = _send_to_s3_landing(date_reference, filename, content)
                 responses[filename] = msg

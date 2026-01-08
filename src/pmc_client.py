@@ -14,11 +14,11 @@ class CliqueEconomiaClient:
         self.logger = logger or logging.getLogger(__name__)
         return 
     
-    def _handle_get(self, url: str, attempt: int = 3) -> urllib3.response.HTTPResponse | None:
+    def _handle_get(self, url: str, attempt: int = 1) -> urllib3.response.HTTPResponse | None:
         
         self.logger.debug(f"Making GET request to {url}")
 
-        http = urllib3.PoolManager()
+        http = urllib3.PoolManager(timeout=urllib3.Timeout(connect=2.0, read=30.0))
 
         for attempt_count in range(attempt):
             self.logger.debug(f"Attempt {attempt_count + 1} of {attempt} for URL: {url}")
@@ -68,9 +68,13 @@ class CliqueEconomiaClient:
             f"{date_str}_Clique_Economia_-_Produto_-_Dicionario_de_Dados.csv",
             f"{date_str}_Clique_Economia_-_Produto_-_Base_de_Dados.csv",
             f"{date_str}_Clique_Economia_-_Dicionario_de_Dados.csv",
-            f"{date_str}_Clique_Economia_-_Cotacoes_-_Base_de_Dados.csv",
-            f"{date_str}_Clique_Economia_-_Base_de_Dados.csv"
+            f"{date_str}_Clique_Economia_-_Cotacoes_-_Base_de_Dados.csv"
         ]
+
+        # The database was incremental until 2023-07-18, so on that date we have to get the full base file
+        if date_reference == datetime(2023, 7, 18).replace(tzinfo=ZoneInfo("America/Sao_Paulo")):
+            filenames.append(f"{date_str}_Clique_Economia_-_Base_de_Dados.csv")
+
         return filenames
 
     def get_file_stream(self, filename: str, date_reference: datetime) -> BytesIO | None:
